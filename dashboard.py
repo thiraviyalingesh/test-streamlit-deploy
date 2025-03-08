@@ -15,8 +15,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
-st.experimental_memo.clear()
-
 # Add custom CSS for dark theme
 st.markdown("""
 <style>
