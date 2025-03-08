@@ -1,5 +1,5 @@
 streamlit
 pymongo
 python-dotenv
-plotly
 pandas
+plotly
