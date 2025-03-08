@@ -1,12 +1,9 @@
 # Import necessary libraries
 import streamlit as st
 import pymongo
-import os
-from dotenv import load_dotenv
-import time
 import pandas as pd
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
+import time
 
 # Page configuration with dark theme
 st.set_page_config(
@@ -15,6 +12,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
 # Add custom CSS for dark theme
 st.markdown("""
 <style>
@@ -35,56 +33,74 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Load environment variables
-load_dotenv()
-
-# Get MongoDB connection details from environment variables
-MONGODB_URI = os.getenv("MONGODB_URI")
-MONGODB_DATABASE = os.getenv("MONGODB_DATABASE")
+# Get MongoDB connection details from Streamlit secrets
+# This is different from using dotenv in local development
+try:
+    # MongoDB connection details - from Streamlit secrets
+    MONGODB_URI = st.secrets["MONGODB_URI"]
+    MONGODB_DATABASE = st.secrets["MONGODB_DATABASE"]
+except Exception as e:
+    st.error(f"Error accessing secrets: {e}")
+    st.warning("Make sure you've configured secrets in Streamlit Cloud")
+    # Provide fallbacks to allow the app to load even with errors
+    MONGODB_URI = None
+    MONGODB_DATABASE = None
 
 # Function to connect to MongoDB and get engagement data
 def get_engagement_data():
-    # Connect to MongoDB
-    client = pymongo.MongoClient(MONGODB_URI)
-    db = client[MONGODB_DATABASE]
-    
-    # Use the correct collection name
-    collection = db["twitter_actions"]
-    
-    # Count total engagements (likes)
-    total_count = collection.count_documents({"action": "like"})
-    
-    # Get time series data for chart
-    pipeline = [
-        {
-            "$match": {
-                "action": "like"
+    if not MONGODB_URI or not MONGODB_DATABASE:
+        return 0, pd.DataFrame()  # Return empty data if credentials not available
+        
+    try:
+        # Connect to MongoDB with timeout settings
+        client = pymongo.MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
+        
+        # Verify connection
+        client.admin.command('ping')  # Will raise error if connection fails
+        
+        db = client[MONGODB_DATABASE]
+        
+        # Use the correct collection name
+        collection = db["twitter_actions"]
+        
+        # Count total engagements (likes)
+        total_count = collection.count_documents({"action": "like"})
+        
+        # Get time series data for chart
+        pipeline = [
+            {
+                "$match": {
+                    "action": "like"
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$date_only",  # Group by date_only field
+                    "count": {"$sum": 1}  # Count engagements per day
+                }
+            },
+            {
+                "$sort": {"_id": 1}  # Sort by date
             }
-        },
-        {
-            "$group": {
-                "_id": "$date_only",  # Group by date_only field
-                "count": {"$sum": 1}  # Count engagements per day
-            }
-        },
-        {
-            "$sort": {"_id": 1}  # Sort by date
-        }
-    ]
-    
-    result = list(collection.aggregate(pipeline))
-    
-    # Close connection
-    client.close()
-    
-    # Create DataFrame for time series
-    time_df = pd.DataFrame(result)
-    if not time_df.empty:
-        time_df = time_df.rename(columns={"_id": "date", "count": "engagements"})
-        # Convert date strings to datetime objects for better plotting
-        time_df["date"] = pd.to_datetime(time_df["date"])
-    
-    return total_count, time_df
+        ]
+        
+        result = list(collection.aggregate(pipeline))
+        
+        # Close connection
+        client.close()
+        
+        # Create DataFrame for time series
+        time_df = pd.DataFrame(result)
+        if not time_df.empty:
+            time_df = time_df.rename(columns={"_id": "date", "count": "engagements"})
+            # Convert date strings to datetime objects for better plotting
+            time_df["date"] = pd.to_datetime(time_df["date"])
+        
+        return total_count, time_df
+        
+    except Exception as e:
+        st.error(f"MongoDB Connection Error: {str(e)}")
+        return 0, pd.DataFrame()  # Return empty data on error
 
 # Title
 st.markdown("<h1 style='text-align: center;'>Tweet Engagements Dashboard</h1>", unsafe_allow_html=True)
@@ -95,6 +111,10 @@ if st.button("Refresh Data"):
 
 # Display last updated time
 st.write(f"Last updated: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+# Show connection status
+if not MONGODB_URI or not MONGODB_DATABASE:
+    st.warning("MongoDB credentials not configured. Please set up secrets in Streamlit Cloud.")
 
 # Get data
 total_engagements, time_data = get_engagement_data()
