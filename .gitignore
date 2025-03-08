@@ -1,0 +1,25 @@
+# Ignore node_modules directory
+venv/
+my_venv/
+document/
+dist/
+build/
+
+# Ignore log files
+*.log
+
+# Ignore env files
+*.env
+
+# Ignore jpg and json files
+*.jpg
+*.json
+*.csv
+*.enctemp
+
+__pycache__/
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
