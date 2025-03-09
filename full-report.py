@@ -262,16 +262,25 @@ def get_success_ratio():
         logger.error(f"Error calculating success ratio: {str(e)}")
         return 0
 
-def get_engagement_time_series():
+def get_engagement_time_series(days_range=7):
+    """
+    Fetches engagement time series data for a configurable date range.
+    
+    Args:
+        days_range (int): Number of days to look back (default: 7)
+    
+    Returns:
+        pandas.DataFrame: DataFrame with daily engagement counts
+    """
     try:
-        logger.info("Fetching engagement time series data")
+        logger.info(f"Fetching engagement time series data for last {days_range} days")
         client = pymongo.MongoClient(MONGODB_URI)
         db = client[MONGODB_DATABASE]
         collection = db["twitter_actions"]
         
-        # Calculate last 7 days date range
+        # Calculate dynamic date range
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=6)
+        start_date = end_date - timedelta(days=days_range - 1)  # -1 because we want to include today
         
         # Create aggregation pipeline
         pipeline = [
@@ -519,14 +528,18 @@ def get_rerun_comparison_data():
         }
 
 def main():
-    """
-    Main function to run the Streamlit dashboard.
-    Displays:
-    - Key metrics (Total Engagements, Successful Engagements, Success Ratio)
-    - Time series engagement data
-    - Top celebrity and user engagement data
-    """
+    """Main function to run the Streamlit dashboard."""
     logger.info("Starting dashboard application")
+    
+    # Add date range selector in sidebar
+    st.sidebar.title("Dashboard Settings")
+    days_range = st.sidebar.slider(
+        "Select Time Range (Days)",
+        min_value=1,
+        max_value=30,
+        value=7,
+        help="Choose how many days of data to display"
+    )
     
     # Page header
     st.markdown("<h1 style='text-align: center;'>Tweet Engagements Dashboard</h1>", unsafe_allow_html=True)
@@ -544,7 +557,7 @@ def main():
     success_ratio = get_success_ratio()
     celebrity_data = get_celebrity_engagement_data()
     user_data = get_user_engagement_data()
-    time_series_data = get_engagement_time_series()
+    time_series_data = get_engagement_time_series(days_range)
     
     # Display metrics in same line
     col1, col2, col3 = st.columns(3)
@@ -608,7 +621,10 @@ def main():
 
     # Time series chart
     st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-    st.markdown('<div class="chart-title">Daily Engagement Trends (Last 7 Days)</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="chart-title">Daily Engagement Trends (Last {days_range} Days)</div>',
+        unsafe_allow_html=True
+    )
     
     if not time_series_data.empty:
         fig = go.Figure()
