@@ -544,20 +544,13 @@ def main():
     # Page header
     st.markdown("<h1 style='text-align: center;'>Tweet Engagements Dashboard</h1>", unsafe_allow_html=True)
     
-    # Refresh button and timestamp
-    col1, col2 = st.columns([1, 5])
-    with col1:
-        if st.button("Refresh Data"):
-            logger.info("Manual refresh triggered")
-            st.rerun()
-    
     # Get all required data
     total_engagements = get_total_engagements()
     successful_engagements = get_successful_engagements()
     success_ratio = get_success_ratio()
     celebrity_data = get_celebrity_engagement_data()
     user_data = get_user_engagement_data()
-    time_series_data = get_engagement_time_series(days_range)
+    time_series_data = get_engagement_time_series(days_range)  # Using dynamic days_range
     
     # Display metrics in same line
     col1, col2, col3 = st.columns(3)
