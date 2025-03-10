@@ -16,7 +16,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("dashboard.log"),
+        logging.FileHandler("debugger.log"),
         logging.StreamHandler()
     ]
 )
@@ -154,6 +154,17 @@ load_dotenv()
 MONGODB_URI = os.getenv("MONGODB_URI")
 MONGODB_DATABASE = os.getenv("MONGODB_DATABASE")
 
+# Twitter color palette
+TWITTER_COLORS = {
+    'blue': '#1DA1F2',
+    'black': '#14171A',
+    'dark_gray': '#657786',
+    'light_gray': '#AAB8C2',
+    'extra_light_gray': '#E1E8ED',
+    'extra_extra_light_gray': '#F5F8FA',
+    'white': '#FFFFFF'
+}
+
 def get_total_engagements():
     """
     Function to fetch the total number of tweet engagements.
@@ -251,18 +262,20 @@ def get_success_ratio():
         logger.error(f"Error calculating success ratio: {str(e)}")
         return 0
 
-def get_engagement_time_series():
+def get_engagement_time_series(start_date, end_date):
+    """
+    Fetches engagement time series data for a given date range.
+    """
     try:
         logger.info("Fetching engagement time series data")
         client = pymongo.MongoClient(MONGODB_URI)
         db = client[MONGODB_DATABASE]
         collection = db["twitter_actions"]
         
-        # Calculate last 7 days date range
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=6)
+        # Get current date in UTC
+        end_date = datetime.utcnow()
+        start_date = end_date - timedelta(days=7)
         
-        # Create aggregation pipeline
         pipeline = [
             {
                 "$match": {
@@ -277,7 +290,8 @@ def get_engagement_time_series():
                     "_id": {
                         "$dateToString": {
                             "format": "%Y-%m-%d",
-                            "date": "$date"
+                            "date": "$date",
+                            "timezone": "UTC"  # Explicitly set timezone to UTC
                         }
                     },
                     "engagements": {"$sum": 1}
@@ -294,34 +308,29 @@ def get_engagement_time_series():
         # Convert to DataFrame
         df = pd.DataFrame(result)
         if not df.empty:
-            df = df.rename(columns={"_id": "date"})
+            df = df.rename(columns={"_id": "date", "engagements": "engagements"})
             df['date'] = pd.to_datetime(df['date'])
             
-            # Fill missing dates with zeros
-            date_range = pd.date_range(start=start_date.date(), end=end_date.date())
+            # Create complete date range for last 7 days
+            date_range = pd.date_range(start=start_date.date(), end=end_date.date(), freq='D')
             all_dates = pd.DataFrame({'date': date_range})
-            df = pd.merge(all_dates, df, on='date', how='left').fillna(0)
             
+            # Merge with actual data and fill missing values
+            df = pd.merge(all_dates, df, on='date', how='left').fillna(0)
+            df['engagements'] = df['engagements'].astype(int)
+            
+            logger.info(f"Time series data: {df.to_dict('records')}")  # Add logging
             return df.sort_values('date')
         
         return pd.DataFrame(columns=['date', 'engagements'])
         
     except Exception as e:
-        logger.error(f"MongoDB Connection Error: {str(e)}")
-        st.error(f"MongoDB Connection Error: {str(e)}")
-        return pd.DataFrame()
+        logger.error(f"Error in time series data: {str(e)}")
+        return pd.DataFrame(columns=['date', 'engagements'])
 
 def get_celebrity_engagement_data():
     """
     Fetches and aggregates engagement counts by celebrity tweet.
-    Returns top 5 celebrities with highest engagement counts.
-    
-    Returns:
-        pandas.DataFrame: DataFrame containing celebrity usernames and their engagement counts
-        Columns: ['username', 'engagements']
-    
-    Raises:
-        Returns empty DataFrame with appropriate error message on failure
     """
     try:
         logger.info("Fetching celebrity engagement data")
@@ -330,31 +339,41 @@ def get_celebrity_engagement_data():
         collection = db["twitter_actions"]
         
         pipeline = [
-            {"$group": {
-                "_id": "$username",
-                "count": {"$sum": 1}
-            }},
-            {"$sort": {"count": -1}},
-            {"$limit": 5}
+            {
+                "$match": {
+                    "username": {"$exists": True, "$ne": None}
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$username",
+                    "engagements": {"$sum": 1}
+                }
+            },
+            {
+                "$sort": {"engagements": -1}
+            },
+            {
+                "$limit": 5
+            }
         ]
         
         result = list(collection.aggregate(pipeline))
         client.close()
         
-        df = pd.DataFrame(result)
-        if not df.empty:
-            df = df.rename(columns={"_id": "username", "count": "engagements"})
+        if result:
+            df = pd.DataFrame(result)
+            df = df.rename(columns={"_id": "username", "engagements": "engagements"})
+            # Clean up usernames (remove @ if present)
             df['username'] = df['username'].apply(lambda x: x.replace('@', '') if isinstance(x, str) and x.startswith('@') else x)
             logger.info(f"Found {len(df)} celebrity records")
             return df
         
         logger.warning("No celebrity engagement data found")
-        st.error("No celebrity engagement data available")
         return pd.DataFrame(columns=['username', 'engagements'])
         
     except Exception as e:
         logger.error(f"Error fetching celebrity data: {str(e)}")
-        st.error("Failed to fetch celebrity engagement data")
         return pd.DataFrame(columns=['username', 'engagements'])
 
 def get_user_engagement_data():
@@ -508,19 +527,13 @@ def get_rerun_comparison_data():
         }
 
 def main():
-    """
-    Main function to run the Streamlit dashboard.
-    Displays:
-    - Key metrics (Total Engagements, Successful Engagements, Success Ratio)
-    - Time series engagement data
-    - Top celebrity and user engagement data
-    """
+    """Main function to run the Streamlit dashboard."""
     logger.info("Starting dashboard application")
     
     # Page header
     st.markdown("<h1 style='text-align: center;'>Tweet Engagements Dashboard</h1>", unsafe_allow_html=True)
     
-    # Refresh button and timestamp
+    # Refresh button and timestamp in same line
     col1, col2 = st.columns([1, 5])
     with col1:
         if st.button("Refresh Data"):
@@ -536,9 +549,13 @@ def main():
     success_ratio = get_success_ratio()
     celebrity_data = get_celebrity_engagement_data()
     user_data = get_user_engagement_data()
-    time_series_data = get_engagement_time_series()
-    
-    # Display metrics in same line
+    time_series_data = get_engagement_time_series(
+        datetime.now() - timedelta(days=7),
+        datetime.now()
+    )
+    rerun_data = get_rerun_comparison_data()
+
+    # Display KPI metrics in same line
     col1, col2, col3 = st.columns(3)
     
     with col1:
@@ -591,21 +608,77 @@ def main():
             margin=dict(t=0, b=0, l=0, r=0),
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
-            width=200,
-            height=200
+            width=150,
+            height=150
         )
         
         st.plotly_chart(fig, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Time series chart
+    # Modified Initial vs Rerun Performance - Combined into 2 charts
+    st.markdown("### Initial vs Rerun Performance")
+    col1, col2 = st.columns(2)
+    
+    # Initial Run Chart (Combined)
+    with col1:
+        initial_data = {
+            'Metric': ['Likes', 'Retweets', 'Comments'],
+            'Count': [
+                rerun_data['initial']['likes'],
+                rerun_data['initial']['retweets'],
+                rerun_data['initial']['comments']
+            ]
+        }
+        
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=initial_data['Metric'],
+            y=initial_data['Count'],
+            marker_color=['#ff3333', '#3498db', '#74c69d']
+        ))
+        
+        fig.update_layout(
+            title='Initial Run Metrics',
+            height=300,
+            margin=dict(l=20, r=20, t=40, b=20),
+            showlegend=False
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Rerun Chart (Combined)
+    with col2:
+        rerun_data_combined = {
+            'Metric': ['Likes', 'Retweets', 'Comments'],
+            'Count': [
+                rerun_data['rerun']['likes'],
+                rerun_data['rerun']['retweets'],
+                rerun_data['rerun']['comments']
+            ]
+        }
+        
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=rerun_data_combined['Metric'],
+            y=rerun_data_combined['Count'],
+            marker_color=['#ff3333', '#3498db', '#74c69d']
+        ))
+        
+        fig.update_layout(
+            title='Rerun Metrics',
+            height=300,
+            margin=dict(l=20, r=20, t=40, b=20),
+            showlegend=False
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+
+    # Time series chart with reduced height
     st.markdown('<div class="chart-container">', unsafe_allow_html=True)
     st.markdown('<div class="chart-title">Daily Engagement Trends (Last 7 Days)</div>', unsafe_allow_html=True)
     
     if not time_series_data.empty:
         fig = go.Figure()
-        
-        # Add line with markers and text labels
         fig.add_trace(go.Scatter(
             x=time_series_data['date'],
             y=time_series_data['engagements'],
@@ -614,108 +687,79 @@ def main():
             line=dict(color='#3498db', width=3),
             marker=dict(size=8),
             text=time_series_data['engagements'].astype(int),
-            textposition='top center',
-            textfont=dict(size=12, color='white')
+            textposition='top center'
         ))
         
         fig.update_layout(
-            xaxis_title=None,
-            yaxis_title="Number of Engagements",
-            template='plotly_dark',
-            height=400,
+            height=250,
             margin=dict(l=20, r=20, t=40, b=20),
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)'
+            showlegend=False
         )
         
         st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.error("No time series data available")
-    
-    st.markdown('</div>', unsafe_allow_html=True)
 
-    # Side-by-side bar charts
+    # Modified Celebrity and User engagement charts - Ensuring descending order
     col1, col2 = st.columns(2)
     
-    # Celebrity engagement chart
+    # Celebrity engagement chart - Top 5 descending
     with col1:
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        st.markdown('<div class="chart-title">Top Celebrity Engagements</div>', unsafe_allow_html=True)
+        st.markdown('<div class="chart-title">Top 5 Celebrity Engagements</div>', unsafe_allow_html=True)
         
         if not celebrity_data.empty:
-            # Sort data in descending order
+            # Ensure top 5 descending order
             celebrity_data = celebrity_data.sort_values('engagements', ascending=False).head(5)
             
-            fig = px.bar(
-                celebrity_data,
-                y='username',
-                x='engagements',
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                y=celebrity_data['username'],
+                x=celebrity_data['engagements'],
                 orientation='h',
-                color_discrete_sequence=['#3498db']
-            )
-            
-            fig.update_traces(
-                texttemplate='%{x}',
-                textposition='outside',
-                textfont=dict(size=14, color='white')
-            )
+                marker_color='#3498db',
+                text=celebrity_data['engagements'],
+                textposition='outside'
+            ))
             
             fig.update_layout(
+                height=300,
+                margin=dict(l=20, r=20, t=20, b=20),
+                showlegend=False,
                 xaxis_title=None,
                 yaxis_title=None,
-                yaxis={'categoryorder':'total ascending'},  # This will show bars in descending order
-                template='plotly_dark',
-                height=300,
-                margin=dict(l=20, r=20, t=10, b=20),
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)'
+                yaxis={'categoryorder':'total descending'}  # This ensures descending order
             )
             
             st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.error("No celebrity engagement data available")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
     
-    # User engagement chart
+    # User engagement chart - Top 5 descending
     with col2:
         st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        st.markdown('<div class="chart-title">Top User Engagements</div>', unsafe_allow_html=True)
+        st.markdown('<div class="chart-title">Top 5 User Engagements</div>', unsafe_allow_html=True)
         
         if not user_data.empty:
-            # Sort data in descending order
+            # Ensure top 5 descending order
             user_data = user_data.sort_values('engagements', ascending=False).head(5)
             
-            fig = px.bar(
-                user_data,
-                y='name',
-                x='engagements',
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                y=user_data['name'],
+                x=user_data['engagements'],
                 orientation='h',
-                color_discrete_sequence=['#3498db']
-            )
-            
-            fig.update_traces(
-                texttemplate='%{x}',
-                textposition='outside',
-                textfont=dict(size=14, color='white')
-            )
+                marker_color='#3498db',
+                text=user_data['engagements'],
+                textposition='outside'
+            ))
             
             fig.update_layout(
+                height=300,
+                margin=dict(l=20, r=20, t=20, b=20),
+                showlegend=False,
                 xaxis_title=None,
                 yaxis_title=None,
-                yaxis={'categoryorder':'total ascending'},  # This will show bars in descending order
-                template='plotly_dark',
-                height=300,
-                margin=dict(l=20, r=20, t=10, b=20),
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)'
+                yaxis={'categoryorder':'total descending'}  # This ensures descending order
             )
             
             st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.error("No user engagement data available")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()

@@ -27,361 +27,123 @@ st.set_page_config(
     page_title="Tweet Engagements Dashboard",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="collapsed",
-    menu_items={
-        'Get Help': None,
-        'Report a bug': None,
-        'About': None
-    }
+    initial_sidebar_state="collapsed"
 )
 
-# Dark theme styling with smaller KPI cards and cream browser background
+# Add custom CSS for dark theme
 st.markdown("""
 <style>
-    .main, .main .block-container, body, [data-testid="stAppViewContainer"] {
-        background-color: #f5f3e8 !important;
+    /* Main background and text colors */
+    .main {
+        background-color: #1E1E1E;
+        color: white;
     }
     
-    /* Fix for stApp wrapper */
-    .stApp {
-        background-color: #f5f3e8 !important;
+    /* Button styling */
+    .stButton>button {
+        background-color: #990000;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 10px 20px;
+        font-weight: bold;
+        transition: all 0.3s ease;
+    }
+    .stButton>button:hover {
+        background-color: #c20000;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     }
     
-    /* Dark themed containers on cream background */
+    /* Headings */
+    h1, h2, h3 {
+        color: white;
+    }
+    
+    /* Metrics container */
     .metric-container {
         text-align: center; 
-        background-color: #1e1e1e; 
-        padding: 12px; 
-        border-radius: 8px; 
-        margin: 6px 0;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        border-left: 3px solid #3498db;
-        height: auto;
-        color: #f0f0f0;
+        background-color: #2C2C2C; 
+        padding: 20px; 
+        border-radius: 15px; 
+        margin-top: 10px; 
+        margin-bottom: 20px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        border-left: 5px solid #3498db;
+        height: 100%;
     }
     
     /* Success metrics container */
     .success-metric-container {
         text-align: center; 
-        background-color: #1e1e1e; 
-        padding: 12px; 
-        border-radius: 8px; 
-        margin: 6px 0;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        border-left: 3px solid #27ae60;
-        height: auto;
-        color: #f0f0f0;
+        background-color: #2C2C2C; 
+        padding: 20px; 
+        border-radius: 15px; 
+        margin-top: 10px; 
+        margin-bottom: 20px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        border-left: 5px solid #27ae60;
+        height: 100%;
     }
     
     /* Metric title */
     .metric-title {
         color: #3498db;
-        font-weight: 600;
-        font-size: 1rem;
-        margin-bottom: 6px;
+        font-weight: bold;
+        font-size: 1.8rem;
+        margin-bottom: 15px;
     }
     
     /* Success metric title */
     .success-metric-title {
         color: #27ae60;
-        font-weight: 600;
-        font-size: 1rem;
-        margin-bottom: 6px;
+        font-weight: bold;
+        font-size: 1.8rem;
+        margin-bottom: 15px;
     }
     
-    /* Small big number display */
+    /* Big number display */
     .big-number {
         color: #3498db; 
-        font-size: 32px;
-        font-weight: 700;
-        margin: 4px 0;
-        text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+        font-size: 60px;
+        font-weight: bold;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
     }
     
     /* Success big number display */
     .success-big-number {
         color: #27ae60; 
-        font-size: 32px;
-        font-weight: 700;
-        margin: 4px 0;
-        text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+        font-size: 60px;
+        font-weight: bold;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
     }
     
     /* Chart container */
     .chart-container {
-        padding: 15px;
-        border-radius: 8px;
-        background-color: #1e1e1e;
-        margin: 12px 0;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        color: #f0f0f0;
-    }
-    
-    /* Chart borders */
-    .engagement-chart {
-        border-left: 3px solid #1DA1F2;
-    }
-    
-    .success-chart {
-        border-left: 3px solid #27ae60;
+        background-color: #2C2C2C;
+        padding: 25px;
+        border-radius: 15px;
+        margin-top: 20px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        border-left: 5px solid #3498db;
     }
     
     /* Chart title */
     .chart-title {
-        color: #e0e0e0;
-        font-size: 1.2rem;
-        font-weight: 600;
-        margin-bottom: 12px;
+        color: #3498db;
+        font-size: 1.5rem;
+        font-weight: bold;
+        margin-bottom: 20px;
     }
     
-    /* Section headers */
-    h1, h2, h3, h4 {
-        font-weight: 600;
-        color: #333333; /* Dark text on cream background */
-        margin: 15px 0 10px 0;
+    /* Footer styling */
+    .footer {
+        text-align: center;
+        padding: 20px;
+        color: #aaa;
+        font-size: 0.9rem;
+        margin-top: 30px;
+        border-top: 1px solid #444;
     }
-    
-    /* Button styling */
-    .stButton>button {
-        background-color: #1DA1F2;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        padding: 8px 15px;
-        font-weight: 600;
-        transition: all 0.2s ease;
-    }
-    
-    .stButton>button:hover {
-        background-color: #0c80cf;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }
-    
-    /* Last updated text */
-    .last-updated {
-        color: #555;
-        font-size: 12px;
-        font-style: italic;
-        margin-left: 15px;
-    }
-    .refresh-button {
-    background: linear-gradient(45deg, #2193b0, #6dd5ed);
-    color: white;
-    border: none;
-    border-radius: 30px;
-    padding: 10px 20px;
-    font-weight: 600;
-    font-size: 16px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    display: inline-block;
-    text-align: center;
-    text-decoration: none;
-    position: relative;
-    overflow: hidden;
-    z-index: 10;
-    }
-
-    .refresh-button:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 7px 20px rgba(0,0,0,0.3);
-    }
-
-    .refresh-button::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(45deg, #6dd5ed, #2193b0);
-        opacity: 0;
-        z-index: -1;
-        transition: opacity 0.3s ease;
-    }
-
-    .refresh-button:hover::after {
-        opacity: 1;
-    }
-
-    /* Animated text styles */
-    .text7 {
-    color: white;
-    font-weight: bold;
-    font-size: 26px;
-    box-sizing: content-box;
-    -webkit-box-sizing: content-box;
-    height: 40px;
-    display: flex;
-    margin-top: 10px;
-    justify-content: center;
-    }
-    .text7 .words {
-    overflow: hidden;
-    position: relative;
-    top: 50%;
-    }
-    .text7 span {
-    display: block;
-    padding-left: 6px;
-    padding-top: 5px;
-    color: #956afa;
-    animation: text7-animation 4s infinite;
-    }
-    @keyframes text7-animation {
-    10% {
-        -webkit-transform: translateY(-102%);
-        transform: translateY(-102%);
-    }
-    25% {
-        -webkit-transform: translateY(-100%);
-        transform: translateY(-100%);
-    }
-    35% {
-        -webkit-transform: translateY(-202%);
-        transform: translateY(-202%);
-    }
-    50% {
-        -webkit-transform: translateY(-200%);
-        transform: translateY(-200%);
-    }
-    60% {
-        -webkit-transform: translateY(-302%);
-        transform: translateY(-302%);
-    }
-    75% {
-        -webkit-transform: translateY(-300%);
-        transform: translateY(-300%);
-    }
-    85% {
-        -webkit-transform: translateY(-402%);
-        transform: translateY(-402%);
-    }
-    100% {
-        -webkit-transform: translateY(-400%);
-        transform: translateY(-400%);
-    }
-    }
-    
-    .text7 {
-  color: black;
-  font-weight: bold;
-  font-size: 26px;
-  box-sizing: content-box;
-  -webkit-box-sizing: content-box;
-  height: 40px;
-  display: flex;
-}
-.text7 .words {
-  overflow: hidden;
-  position: relative;
-  top: 50%;
-}
-.text7 span {
-  display: block;
-  padding-left: 6px;
-  padding-top: 5px;
-  color: #956afa;
-  animation: text7-animation 4s infinite;
-}
-@keyframes text7-animation {
-  10% {
-    -webkit-transform: translateY(-102%);
-    transform: translateY(-102%);
-  }
-  25% {
-    -webkit-transform: translateY(-100%);
-    transform: translateY(-100%);
-  }
-  35% {
-    -webkit-transform: translateY(-202%);
-    transform: translateY(-202%);
-  }
-  50% {
-    -webkit-transform: translateY(-200%);
-    transform: translateY(-200%);
-  }
-  60% {
-    -webkit-transform: translateY(-302%);
-    transform: translateY(-302%);
-  }
-  75% {
-    -webkit-transform: translateY(-300%);
-    transform: translateY(-300%);
-  }
-  85% {
-    -webkit-transform: translateY(-402%);
-    transform: translateY(-402%);
-  }
-  100% {
-    -webkit-transform: translateY(-400%);
-    transform: translateY(-400%);
-  }
-}
-
-/* Elegant rich cards with smooth hover */
-.elegant-card {
-    background: linear-gradient(135deg, #6c3c00, #e6b25d);
-    border-radius: 15px;
-    padding: 25px;
-    color: white;
-    transition: all 0.4s ease;
-    box-shadow: 0 10px 20px rgba(108, 60, 0, 0.2);
-    border: none;
-    position: relative;
-    overflow: hidden;
-    height: 100%;
-}
-
-.elegant-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(135deg, rgba(230, 178, 93, 0.3), rgba(108, 60, 0, 0.1));
-    opacity: 0;
-    transition: opacity 0.4s ease;
-    z-index: 1;
-    border-radius: 15px;
-}
-
-.elegant-card:hover {
-    transform: translateY(-10px);
-    box-shadow: 0 15px 30px rgba(108, 60, 0, 0.3);
-}
-
-.elegant-card:hover::before {
-    opacity: 1;
-}
-
-.elegant-card .card-title {
-    font-size: 1.2rem;
-    font-weight: 600;
-    margin-bottom: 12px;
-    position: relative;
-    z-index: 2;
-    letter-spacing: 0.5px;
-}
-
-.elegant-card .card-value {
-    font-size: 48px;
-    font-weight: 700;
-    margin: 15px 0;
-    position: relative;
-    z-index: 2;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.elegant-card.primary {
-    background: linear-gradient(135deg, #6c3c00, #e6b25d);
-}
-
-.elegant-card.secondary {
-    background: linear-gradient(135deg, #004e6c, #5dbfe6);
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -771,24 +533,7 @@ def main():
     logger.info("Starting dashboard application")
     
     # Page header
-    # Page header with animated text
-    st.markdown("""
-        <h1 style='color: #333333; text-align: center; padding: 20px 0 10px 0; margin: 0;'>
-            Tweet Engagements Dashboard
-        </h1>
-        
-        <div class="text7" style="justify-content: center; margin-bottom: 20px;">
-            <div>WE GENERATE</div>
-            <div class="words">
-                <span>LIKES</span>
-                <span>RETWEETS</span>
-                <span>COMMENTS</span>
-                <span>ENGAGEMENT</span>
-                <span>LIKES</span>
-            </div>
-            <div>FOR YOU!!</div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center;'>Tweet Engagements Dashboard</h1>", unsafe_allow_html=True)
     
     # Refresh button and timestamp in same line
     col1, col2 = st.columns([1, 5])
@@ -809,98 +554,71 @@ def main():
     time_series_data = get_engagement_time_series()
     rerun_data = get_rerun_comparison_data()
 
-    # Create a 2-column layout: Left for KPIs (1/3) and Right for pie chart (2/3)
-    left_col, right_col = st.columns([1, 2])
-
-    # Left column - Stacked KPI cards
-    with left_col:
-        # Total Engagements Card
+    # Display KPI metrics in same line
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
         st.markdown(
             f"""
-            <div class="elegant-card primary" style="padding: 0.6rem; margin-bottom: 10px; height: 175px;">
-                <div class="card-title" style="font-size: 0.7rem;">Total Engagements</div>
-                <div class="card-value" style="font-size: 1.2rem;">{total_engagements}</div>
+            <div class="metric-container">
+                <div class="metric-title">Total Engagements</div>
+                <div class="big-number">{total_engagements}</div>
             </div>
             """, 
             unsafe_allow_html=True
         )
-
-        # Successful Engagements Card
+    
+    with col2:
         st.markdown(
             f"""
-            <div class="elegant-card secondary" style="padding: 0.6rem; height: 175px;">
-                <div class="card-title" style="font-size: 0.7rem;">Successful Engagements</div>
-                <div class="card-value" style="font-size: 1.2rem;">{successful_engagements}</div>
+            <div class="metric-container">
+                <div class="metric-title">Successful Engagements</div>
+                <div class="big-number">{successful_engagements}</div>
             </div>
             """, 
             unsafe_allow_html=True
         )
-
-    # Right column - Large pie chart
-    with right_col:
-        # Success Ratio heading
-        st.markdown(
-            """
-            <h3 style="text-align: center; color: #6c3c00; font-size: 40px; font-weight: bold;">
-                Success Ratio
-            </h3>
-            """,
-            unsafe_allow_html=True
-        )
-        
+    
+    with col3:
         # Success ratio donut chart
-        fig_success = go.Figure(data=[go.Pie(
-            labels=['Successful', 'Failed'],
-            values=[success_ratio, 100 - success_ratio],
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        st.markdown('<div class="chart-title">Success Ratio</div>', unsafe_allow_html=True)
+        
+        labels = ['Successful', 'Failed']
+        values = [success_ratio, 100 - success_ratio]
+        colors = ['#74c69d', '#e9ecef']
+        
+        fig = go.Figure(data=[go.Pie(
+            labels=labels,
+            values=values,
             hole=0.7,
             textinfo='none',
-            marker=dict(
-                colors=['#32c5d2', '#ffb822'],
-                line=dict(color='#8a7356', width=2)
-            )
+            marker=dict(colors=colors)
         )])
         
-        fig_success.update_layout(
+        fig.add_annotation(
+            text=f"{success_ratio:.1f}%",
+            font=dict(size=20, family='Arial', color='white'),
+            showarrow=False
+        )
+        
+        fig.update_layout(
             showlegend=False,
             margin=dict(t=0, b=0, l=0, r=0),
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
-            height=300,  # Increased height for bigger donut
-            width=None,
-            annotations=[
-                dict(
-                    text=f"{success_ratio:.1f}%",
-                    x=0.5,
-                    y=0.5,
-                    font=dict(size=40, color='#6c3c00', family='Arial Black'),
-                    showarrow=False
-                ),
-                dict(
-                    text="Success Rate",
-                    x=0.5,
-                    y=0.4,
-                    font=dict(size=20, color='#6c3c00', family='Arial'),
-                    showarrow=False
-                )
-            ]
+            width=150,
+            height=150
         )
         
-        st.plotly_chart(fig_success, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    # Modern Initial vs Rerun Performance Section
-    st.markdown("""
-        <div style="background: linear-gradient(135deg, #1a1a1a, #2d2d2d); padding: 20px; border-radius: 15px; margin: 20px 0;">
-            <h2 style="text-align: center; color: #fff; font-size: 28px; margin-bottom: 30px;">
-                <span style="background: linear-gradient(120deg, #3498db, #2ecc71); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-                    Initial vs Rerun Performance
-                </span>
-            </h2>
-        </div>
-    """, unsafe_allow_html=True)
-
+    # Modified Initial vs Rerun Performance - Combined into 2 charts
+    st.markdown("### Initial vs Rerun Performance")
     col1, col2 = st.columns(2)
     
-    # Initial Run Chart (Modernized)
+    # Initial Run Chart (Combined)
     with col1:
         initial_data = {
             'Metric': ['Likes', 'Retweets', 'Comments'],
@@ -915,63 +633,19 @@ def main():
         fig.add_trace(go.Bar(
             x=initial_data['Metric'],
             y=initial_data['Count'],
-            marker_color=['#FF6B6B', '#4ECDC4', '#45B7D1'],
-            marker_line_width=0,
-            opacity=0.9
+            marker_color=['#ff3333', '#3498db', '#74c69d']
         ))
         
-        # Add value labels on top of bars
-        for i, value in enumerate(initial_data['Count']):
-            fig.add_annotation(
-                x=initial_data['Metric'][i],
-                y=value,
-                text=str(value),
-                showarrow=False,
-                yshift=10,
-                font=dict(size=14, color='#ffffff')
-            )
-        
         fig.update_layout(
-            title=dict(
-                text='Initial Run Metrics',
-                font=dict(size=20, color='#ffffff'),
-                x=0.5,
-                y=0.95
-            ),
-            height=400,
-            template='plotly_dark',
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            margin=dict(l=20, r=20, t=60, b=20),
-            showlegend=False,
-            xaxis=dict(
-                showgrid=False,
-                title=None,
-                tickfont=dict(size=14, color='#ffffff')
-            ),
-            yaxis=dict(
-                showgrid=True,
-                gridcolor='rgba(255,255,255,0.1)',
-                title=None,
-                tickfont=dict(size=14, color='#ffffff')
-            ),
-            bargap=0.4
-        )
-        
-        # Add hover effects
-        fig.update_traces(
-            hovertemplate='<b>%{x}</b><br>' +
-                         'Count: %{y}<extra></extra>',
-            hoverlabel=dict(
-                bgcolor='rgba(255,255,255,0.9)',
-                font_size=14,
-                font_color='#000000'
-            )
+            title='Initial Run Metrics',
+            height=300,
+            margin=dict(l=20, r=20, t=40, b=20),
+            showlegend=False
         )
         
         st.plotly_chart(fig, use_container_width=True)
     
-    # Rerun Chart (Modernized)
+    # Rerun Chart (Combined)
     with col2:
         rerun_data_combined = {
             'Metric': ['Likes', 'Retweets', 'Comments'],
@@ -986,138 +660,65 @@ def main():
         fig.add_trace(go.Bar(
             x=rerun_data_combined['Metric'],
             y=rerun_data_combined['Count'],
-            marker_color=['#FF6B6B', '#4ECDC4', '#45B7D1'],
-            marker_line_width=0,
-            opacity=0.9
+            marker_color=['#ff3333', '#3498db', '#74c69d']
         ))
         
-        # Add value labels on top of bars
-        for i, value in enumerate(rerun_data_combined['Count']):
-            fig.add_annotation(
-                x=rerun_data_combined['Metric'][i],
-                y=value,
-                text=str(value),
-                showarrow=False,
-                yshift=10,
-                font=dict(size=14, color='#ffffff')
-            )
-        
         fig.update_layout(
-            title=dict(
-                text='Rerun Metrics',
-                font=dict(size=20, color='#ffffff'),
-                x=0.5,
-                y=0.95
-            ),
-            height=400,
-            template='plotly_dark',
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            margin=dict(l=20, r=20, t=60, b=20),
-            showlegend=False,
-            xaxis=dict(
-                showgrid=False,
-                title=None,
-                tickfont=dict(size=14, color='#ffffff')
-            ),
-            yaxis=dict(
-                showgrid=True,
-                gridcolor='rgba(255,255,255,0.1)',
-                title=None,
-                tickfont=dict(size=14, color='#ffffff')
-            ),
-            bargap=0.4
-        )
-        
-        # Add hover effects
-        fig.update_traces(
-            hovertemplate='<b>%{x}</b><br>' +
-                         'Count: %{y}<extra></extra>',
-            hoverlabel=dict(
-                bgcolor='rgba(255,255,255,0.9)',
-                font_size=14,
-                font_color='#000000'
-            )
+            title='Rerun Metrics',
+            height=300,
+            margin=dict(l=20, r=20, t=40, b=20),
+            showlegend=False
         )
         
         st.plotly_chart(fig, use_container_width=True)
 
-    # Add comparison metrics below charts
-    st.markdown("""
-        <div style="background: linear-gradient(135deg, #2d2d2d, #1a1a1a); padding: 20px; border-radius: 15px; margin: 20px 0;">
-            <div style="display: flex; justify-content: space-around; text-align: center;">
-    """, unsafe_allow_html=True)
-
-    # Calculate percentage changes
-    for metric in ['likes', 'retweets', 'comments']:
-        initial = rerun_data['initial'][metric]
-        rerun = rerun_data['rerun'][metric]
-        if initial > 0:
-            change = ((rerun - initial) / initial) * 100
-            color = '#2ecc71' if change >= 0 else '#e74c3c'
-            arrow = '↑' if change >= 0 else '↓'
-            st.markdown(f"""
-                <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin: 0 10px;">
-                    <h4 style="color: #ffffff; margin: 0;">{metric.title()}</h4>
-                    <p style="color: {color}; font-size: 24px; margin: 10px 0;">
-                        {arrow} {abs(change):.1f}%
-                    </p>
-                </div>
-            """, unsafe_allow_html=True)
-
-    st.markdown("</div></div>", unsafe_allow_html=True)
-
     # Time series chart with reduced height
-    st.markdown('<div class="chart-container engagement-chart dark-chart">', unsafe_allow_html=True)
+    st.markdown('<div class="chart-container">', unsafe_allow_html=True)
     st.markdown('<div class="chart-title">Daily Engagement Trends (Last 7 Days)</div>', unsafe_allow_html=True)
     
     if not time_series_data.empty:
-        fig_trends = go.Figure()
-        fig_trends.add_trace(go.Scatter(
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
             x=time_series_data['date'],
             y=time_series_data['engagements'],
             mode='lines+markers+text',
             name='Engagements',
             line=dict(
-                color='#1DA1F2',
+                color='#3498db', 
                 width=4,
-                shape='spline',
-                smoothing=1.3
+                shape='spline',  # Makes the line curved
+                smoothing=1.3    # Adjusts curve smoothness
             ),
             marker=dict(
                 size=10,
-                color='#1DA1F2'
+                color='#3498db'
             ),
             text=time_series_data['engagements'].astype(int),
             textposition='top center',
             textfont=dict(
                 size=16,
-                color='#FFFFFF',
+                color='white',
                 family='Arial Black'
             )
         ))
         
-        fig_trends.update_layout(
+        fig.update_layout(
             height=250,
             margin=dict(l=20, r=20, t=40, b=20),
             showlegend=False,
-            plot_bgcolor='#1E1E1E',
-            paper_bgcolor='#1E1E1E',
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
             xaxis=dict(
-                showgrid=True,
-                gridcolor='#333333',
-                tickfont=dict(color='#FFFFFF'),
-                title_font=dict(color='#FFFFFF')
+                showgrid=False,
+                gridcolor='#444444'
             ),
             yaxis=dict(
                 showgrid=True,
-                gridcolor='#333333',
-                tickfont=dict(color='#FFFFFF'),
-                title_font=dict(color='#FFFFFF')
+                gridcolor='#444444'
             )
         )
         
-        st.plotly_chart(fig_trends, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True)
 
     # Modified Celebrity and User engagement charts - Ensuring descending order
     col1, col2 = st.columns(2)

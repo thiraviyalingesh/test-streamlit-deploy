@@ -13,22 +13,106 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Add custom CSS for dark theme
+# Add modern CSS styling
 st.markdown("""
 <style>
-    .main {
-        background-color: #1E1E1E;
-        color: white;
+    /* Modern color palette and base styles */
+    :root {
+        --primary: #6C5CE7;
+        --secondary: #A594F9;
+        --accent: #3498db;
+        --background: #111827;
+        --card-bg: #1F2937;
+        --success: #10B981;
+        --warning: #F59E0B;
+        --text: #F3F4F6;
     }
+
+    .main {
+        background-color: var(--background);
+        color: var(--text);
+    }
+
+    /* Modern card styling */
+    .metric-container {
+        background: var(--card-bg);
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition: transform 0.2s ease;
+    }
+    
+    .metric-container:hover {
+        transform: translateY(-5px);
+    }
+
+    .metric-title {
+        color: #94A3B8;
+        font-size: 0.875rem;
+        font-weight: 500;
+        letter-spacing: 0.025em;
+        margin-bottom: 0.5rem;
+    }
+
+    .big-number {
+        color: var(--text);
+        font-size: 2.25rem;
+        font-weight: 700;
+        line-height: 1;
+        background: linear-gradient(45deg, var(--primary), var(--secondary));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    /* Modern button styling */
     .stButton>button {
-        background-color: #990000;
+        background: linear-gradient(45deg, var(--primary), var(--secondary));
         color: white;
         border: none;
-        border-radius: 5px;
-        padding: 10px 20px;
+        border-radius: 12px;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
-    h1, h2, h3 {
-        color: white;
+
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Chart container styling */
+    .chart-container {
+        background: var(--card-bg);
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .chart-title {
+        color: #94A3B8;
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        letter-spacing: 0.025em;
+    }
+
+    /* Header styling */
+    h1 {
+        background: linear-gradient(45deg, var(--primary), var(--secondary));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 800;
+        letter-spacing: -0.025em;
+        text-align: center;
+        margin: 2rem 0;
+    }
+
+    /* Streamlit elements override */
+    .stPlotlyChart {
+        background: transparent !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -132,39 +216,78 @@ st.markdown(
 
 # Create and display time series chart
 if not time_data.empty:
-    # Create Plotly time series chart
+    # Update chart configurations
+    def create_modern_chart_layout(title="", height=300):
+        return dict(
+            template="plotly_dark",
+            height=height,
+            margin=dict(l=20, r=20, t=40, b=20),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='#F3F4F6'),
+            xaxis=dict(
+                showgrid=True,
+                gridcolor='rgba(255,255,255,0.1)',
+                gridwidth=0.5,
+                zeroline=False
+            ),
+            yaxis=dict(
+                showgrid=True,
+                gridcolor='rgba(255,255,255,0.1)',
+                gridwidth=0.5,
+                zeroline=False
+            )
+        )
+
+    # Update time series chart
     fig = go.Figure()
-    
     fig.add_trace(go.Scatter(
         x=time_data['date'],
         y=time_data['engagements'],
         mode='lines+markers',
         name='Engagements',
-        line=dict(color='#3498db', width=3),
-        marker=dict(size=8)
-    ))
-    
-    # Add area under the line
-    fig.add_trace(go.Scatter(
-        x=time_data['date'],
-        y=time_data['engagements'],
+        line=dict(
+            color='#6C5CE7',
+            width=4,
+            shape='spline',
+            smoothing=1.3
+        ),
+        marker=dict(
+            size=8,
+            color='#A594F9',
+            symbol='circle',
+            line=dict(
+                color='#6C5CE7',
+                width=2
+            )
+        ),
         fill='tozeroy',
-        fillcolor='rgba(52, 152, 219, 0.2)',
-        line=dict(width=0),
-        showlegend=False
+        fillcolor='rgba(108,92,231,0.1)'
     ))
-    
-    # Customize layout
+
     fig.update_layout(
-        title="Engagements Over Time",
-        xaxis_title="Date",
-        yaxis_title="Number of Engagements",
-        template="plotly_dark",
-        height=400,
-        margin=dict(l=40, r=40, t=60, b=40)
+        **create_modern_chart_layout("Daily Engagements", 400)
     )
-    
+
     # Display the Plotly chart in Streamlit
     st.plotly_chart(fig, use_container_width=True)
 else:
     st.warning("No time series data available to display chart.")
+
+# Update bar charts
+def create_modern_bar_chart(data, title):
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=data['Metric'],
+        y=data['Count'],
+        marker_color=['#6C5CE7', '#A594F9', '#3498db'],
+        marker_line_color='rgba(255,255,255,0.2)',
+        marker_line_width=1,
+        opacity=0.9
+    ))
+    
+    fig.update_layout(
+        **create_modern_chart_layout(title),
+        bargap=0.4
+    )
+    return fig
