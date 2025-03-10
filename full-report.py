@@ -11,6 +11,24 @@ from datetime import datetime, timedelta
 import logging
 import json
 
+# Disable theme switcher and force light mode
+st.set_page_config(
+    page_title="Tweet Engagements Dashboard",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
+# Hide the theme switcher
+st.markdown("""
+    <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        /* Hide theme switcher */
+        .stDeployButton, div[data-testid="stToolbar"] {display: none !important;}
+    </style>
+""", unsafe_allow_html=True)
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -22,21 +40,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Page configuration with dark theme
-st.set_page_config(
-    page_title="Tweet Engagements Dashboard",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
-
-# Add custom CSS for dark theme
+# Add custom CSS for light theme
 st.markdown("""
 <style>
     /* Main background and text colors */
     .main {
-        background-color: #1E1E1E;
-        color: white;
+        background-color: #FFFFFF;
+        color: black;
     }
     
     /* Button styling */
@@ -56,13 +66,13 @@ st.markdown("""
     
     /* Headings */
     h1, h2, h3 {
-        color: white;
+        color: black;
     }
     
     /* Metrics container */
     .metric-container {
         text-align: center; 
-        background-color: #2C2C2C; 
+        background-color: #F0F0F0; 
         padding: 20px; 
         border-radius: 15px; 
         margin-top: 10px; 
@@ -75,7 +85,7 @@ st.markdown("""
     /* Success metrics container */
     .success-metric-container {
         text-align: center; 
-        background-color: #2C2C2C; 
+        background-color: #F0F0F0; 
         padding: 20px; 
         border-radius: 15px; 
         margin-top: 10px; 
@@ -119,7 +129,7 @@ st.markdown("""
     
     /* Chart container */
     .chart-container {
-        background-color: #2C2C2C;
+        background-color: #F0F0F0;
         padding: 25px;
         border-radius: 15px;
         margin-top: 20px;
@@ -278,11 +288,18 @@ def get_engagement_time_series(days_range=7):
         db = client[MONGODB_DATABASE]
         collection = db["twitter_actions"]
         
-        # Calculate dynamic date range
+        # Calculate dynamic date range with timezone awareness
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=days_range - 1)  # -1 because we want to include today
+        start_date = end_date - timedelta(days=days_range - 1)
         
-        # Create aggregation pipeline
+        # Ensure start date begins at 00:00:00
+        start_date = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        # Ensure end date ends at 23:59:59
+        end_date = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        logger.info(f"Querying data from {start_date} to {end_date}")
+        
+        # Modified pipeline to ensure accurate date grouping
         pipeline = [
             {
                 "$match": {
@@ -317,13 +334,18 @@ def get_engagement_time_series(days_range=7):
             df = df.rename(columns={"_id": "date"})
             df['date'] = pd.to_datetime(df['date'])
             
-            # Fill missing dates with zeros
-            date_range = pd.date_range(start=start_date.date(), end=end_date.date())
+            # Create complete date range and merge
+            date_range = pd.date_range(start=start_date.date(), end=end_date.date(), freq='D')
             all_dates = pd.DataFrame({'date': date_range})
             df = pd.merge(all_dates, df, on='date', how='left').fillna(0)
             
+            # Ensure engagements column is integer type
+            df['engagements'] = df['engagements'].astype(int)
+            
+            logger.info(f"Retrieved data: {df.to_dict('records')}")
             return df.sort_values('date')
         
+        logger.warning("No time series data found")
         return pd.DataFrame(columns=['date', 'engagements'])
         
     except Exception as e:
@@ -424,19 +446,17 @@ def get_user_engagement_data():
         
 def get_rerun_comparison_data():
     """
-    Replicates Excel formula logic for comparing Initial Run vs Rerun metrics.
-    Excel formulas reference Analysis Overall sheet cells:
-    D7, D12 (Likes)
-    D8, D13 (Reposts/Retweets)
-    D9, D14 (Comments)
+    Fetches data for comparing Initial Run vs Rerun metrics.
+    Initial Run: Count where 'result' contains 'success'
+    Rerun: Count ALL successful actions (either in 'result' or 'rerun')
     """
     try:
-        logger.info("Fetching rerun comparison data using Excel formula logic")
+        logger.info("Fetching rerun comparison data")
         client = pymongo.MongoClient(MONGODB_URI)
         db = client[MONGODB_DATABASE]
         collection = db["twitter_actions"]
 
-        # Pipeline for initial run (equivalent to D7, D8, D9)
+        # Initial run pipeline (only count 'result' successes)
         initial_pipeline = [
             {
                 "$match": {
@@ -452,7 +472,7 @@ def get_rerun_comparison_data():
                             {
                                 "$cond": [
                                     {"$regexMatch": {"input": "$action", "regex": "repost|retweet", "options": "i"}},
-                                    "retweets",  # Changed from "reposts" to "retweets"
+                                    "retweets",
                                     "comments"
                                 ]
                             }
@@ -463,7 +483,7 @@ def get_rerun_comparison_data():
             }
         ]
 
-        # Pipeline for rerun (equivalent to D12, D13, D14)
+        # Rerun pipeline (count both 'result' and 'rerun' successes)
         rerun_pipeline = [
             {
                 "$match": {
@@ -482,7 +502,7 @@ def get_rerun_comparison_data():
                             {
                                 "$cond": [
                                     {"$regexMatch": {"input": "$action", "regex": "repost|retweet", "options": "i"}},
-                                    "retweets",  # Changed from "reposts" to "retweets"
+                                    "retweets",
                                     "comments"
                                 ]
                             }
@@ -496,36 +516,73 @@ def get_rerun_comparison_data():
         initial_results = {doc["_id"]: doc["count"] for doc in collection.aggregate(initial_pipeline)}
         rerun_results = {doc["_id"]: doc["count"] for doc in collection.aggregate(rerun_pipeline)}
 
-        client.close()
-
-        # Structure data like Excel series
-        metrics = {
+        return {
             "initial": {
                 "likes": initial_results.get("likes", 0),
-                "retweets": initial_results.get("retweets", 0),  # Changed from "reposts" to "retweets"
+                "retweets": initial_results.get("retweets", 0),
                 "comments": initial_results.get("comments", 0)
             },
             "rerun": {
                 "likes": rerun_results.get("likes", 0),
-                "retweets": rerun_results.get("retweets", 0),  # Changed from "reposts" to "retweets"
+                "retweets": rerun_results.get("retweets", 0),
                 "comments": rerun_results.get("comments", 0)
             }
         }
 
-        # If no data found, don't use hardcoded values
-        if all(v == 0 for v in metrics["initial"].values()) and all(v == 0 for v in metrics["rerun"].values()):
-            logger.warning("No rerun comparison data found")
-            return metrics
-
-        logger.info(f"Metrics found - Initial: {metrics['initial']}, Rerun: {metrics['rerun']}")
-        return metrics
-
     except Exception as e:
         logger.error(f"Error fetching rerun comparison data: {str(e)}")
-        return {
-            "initial": {"likes": 0, "retweets": 0, "comments": 0},  # Changed from "reposts" to "retweets"
-            "rerun": {"likes": 0, "retweets": 0, "comments": 0}  # Changed from "reposts" to "retweets"
-        }
+        return None
+    finally:
+        client.close()
+
+def create_rerun_comparison_chart(metrics):
+    """Creates a grouped bar chart comparing initial run vs rerun metrics."""
+    categories = ['Initial Run', 'Rerun']
+    
+    likes_values = [metrics['initial']['likes'], metrics['rerun']['likes']]
+    retweets_values = [metrics['initial']['retweets'], metrics['rerun']['retweets']]
+    comments_values = [metrics['initial']['comments'], metrics['rerun']['comments']]
+    
+    fig = go.Figure()
+    
+    fig.add_trace(go.Bar(
+        x=categories,
+        y=likes_values,
+        name='Likes',
+        marker_color='#ff3333',
+        text=likes_values,
+        textposition='outside'
+    ))
+    
+    fig.add_trace(go.Bar(
+        x=categories,
+        y=retweets_values,
+        name='Retweets',
+        marker_color='#3498db',
+        text=retweets_values,
+        textposition='outside'
+    ))
+    
+    fig.add_trace(go.Bar(
+        x=categories,
+        y=comments_values,
+        name='Comments',
+        marker_color='#74c69d',
+        text=comments_values,
+        textposition='outside'
+    ))
+    
+    fig.update_layout(
+        title="Rerun Facility Performance Comparison",
+        barmode='group',
+        height=400,
+        template='plotly_dark',
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=20, r=20, t=40, b=20)
+    )
+    
+    return fig
 
 def main():
     """Main function to run the Streamlit dashboard."""
@@ -733,6 +790,50 @@ def main():
             st.error("No user engagement data available")
         
         st.markdown('</div>', unsafe_allow_html=True)
+
+    # Add Rerun Comparison Section
+    st.markdown("<h2 style='text-align: center;'>Rerun Analysis</h2>", unsafe_allow_html=True)
+    
+    metrics = get_rerun_comparison_data()
+    
+    if metrics:
+        # Create chart container
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        
+        # Create and display the chart
+        fig = create_rerun_comparison_chart(metrics)
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Calculate and display improvements
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            likes_improvement = ((metrics["rerun"]["likes"] - metrics["initial"]["likes"]) / metrics["initial"]["likes"] * 100) if metrics["initial"]["likes"] > 0 else 0
+            st.metric(
+                label="Likes Improvement", 
+                value=f"{metrics['rerun']['likes'] - metrics['initial']['likes']}",
+                delta=f"{likes_improvement:.1f}%"
+            )
+        
+        with col2:
+            retweets_improvement = ((metrics["rerun"]["retweets"] - metrics["initial"]["retweets"]) / metrics["initial"]["retweets"] * 100) if metrics["initial"]["retweets"] > 0 else 0
+            st.metric(
+                label="Retweets Improvement", 
+                value=f"{metrics['rerun']['retweets'] - metrics['initial']['retweets']}",
+                delta=f"{retweets_improvement:.1f}%"
+            )
+        
+        with col3:
+            comments_improvement = ((metrics["rerun"]["comments"] - metrics["initial"]["comments"]) / metrics["initial"]["comments"] * 100) if metrics["initial"]["comments"] > 0 else 0
+            st.metric(
+                label="Comments Improvement", 
+                value=f"{metrics['rerun']['comments'] - metrics['initial']['comments']}",
+                delta=f"{comments_improvement:.1f}%"
+            )
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        st.error("Failed to fetch rerun comparison data")
 
 if __name__ == "__main__":
     main()
